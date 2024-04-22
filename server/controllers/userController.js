@@ -9,7 +9,7 @@ const checkRefreshToken = async (user_id) => {
   const existingToken = await RefreshToken.findOne({
     where: { user_id: user_id },
   });
-
+  console.log(existingToken);
   return existingToken;
 };
 
@@ -54,7 +54,7 @@ const newRefreshToken = async (req, res) => {
       res.status(403).json({ message: "Token does not exist" });
     }
 
-    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
+    jwt.verify(refreshToken, process.env.REFRESH_JWT_SECRET, (err, user) => {
       if (err)
         return send.status(403).json({ message: "JWT Verification Failed" });
       accessToken = generateAccessToken({
@@ -69,60 +69,45 @@ const newRefreshToken = async (req, res) => {
   }
 };
 
-const getRefreshToken = async (user_id) => {
+const getRefreshToken = async (req, res) => {
   try {
     // Retreive refresh token
     const result = await RefreshToken.findOne({
-      where: { user_id: user_id },
+      where: { user_id: req },
     });
-    return result;
+    return result.dataValues.token;
   } catch (error) {
     console.error("Error getting refresh token:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-const deleteRefreshToken = async (req, res) => {
+const deleteRefreshToken = async (req) => {
   try {
     const user_id = req;
 
     const existingToken = await checkRefreshToken(user_id);
     const refreshToken = await getRefreshToken(user_id);
 
-    console.log(refreshToken, existingToken);
-
     if (!existingToken) {
       // Token does not exist
       res.status(403).json({ message: "Token does not exist" });
     }
 
-    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, user) => {
-      if (err)
-        return send.status(403).json({ message: "JWT Verification Failed" });
-    });
-
     // Token exists
     // Delete Refresh Token
-    RefreshToken.destroy(
-      { token: existingToken.token },
-      { where: { user_id: user_id } }
-    ).then((rowsDeleted) => {
-      if (rowsDeleted > 0) {
-        console.log("Refresh Token deleted successfully.");
-        res.json({
-          message: "Refresh token deleted successfully",
-          refreshToken,
-        });
-      } else {
-        console.log("No matching record found for the given user_id");
-        res.json({
-          message: "No matching record found for the given user_id",
-        });
+    RefreshToken.destroy({ where: { user_id: user_id } }).then(
+      (rowsDeleted) => {
+        if (rowsDeleted > 0) {
+          console.log("Refresh Token deleted successfully.");
+        } else {
+          console.log("No matching record found for the given user_id");
+        }
       }
-    });
+    );
   } catch (error) {
     console.error("Error deleting refresh token:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    // res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -235,6 +220,12 @@ const loginUser = async (req, res) => {
     JWTuser = { user_id: user.user_id, user_email: user.email };
 
     const accessToken = await generateAccessToken(JWTuser);
+
+    res.cookie("accessToken", accessToken, {
+      maxAge: 900000, // 15 minutes
+      secure: false, // set to true if you're using https
+      httpOnly: true,
+    });
     // Generate a JWT token for the authenticated user
     const refreshToken = await createRefreshToken(JWTuser);
 
@@ -250,11 +241,6 @@ const loginUser = async (req, res) => {
       });
       // Save the new Refresh Token
       await newRefreshToken.save();
-      res.cookie("accessToken", accessToken, {
-        maxAge: 900000, // 15 minutes
-        secure: false, // set to true if you're using https
-        httpOnly: true,
-      });
       res.status(200).json({
         message: "Authentication successful",
         accessToken,
@@ -264,7 +250,7 @@ const loginUser = async (req, res) => {
       // Token exists
       // Change Token Value
       RefreshToken.update(
-        { token: existingToken.token },
+        { token: refreshToken },
         { where: { user_id: user.user_id } }
       )
         .then((updatedRows) => {
@@ -330,7 +316,7 @@ const logoutUser = async (req, res) => {
       httpOnly: true,
     });
 
-    deleteRefreshToken(user.user_id);
+    await deleteRefreshToken(user.user_id);
 
     res.status(200).json({ message: "User logged out succesfully" });
   } catch (error) {
