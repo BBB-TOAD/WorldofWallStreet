@@ -13,6 +13,31 @@ const checkRefreshToken = async (user_id) => {
   return existingToken;
 };
 
+const createRefreshToken = async (req) => {
+  const refreshToken = await jwt.sign(req, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
+
+  return refreshToken;
+};
+
+const saveRefreshToken = async (req, res) => {
+  try {
+    const refreshToken = await createRefreshToken(req);
+    console.log(req.user_id, refreshToken);
+
+    const newRefreshToken = new RefreshToken({
+      user_id: req.user_id,
+      token: refreshToken,
+    });
+    // Save the new Refresh Token
+    const rest = await newRefreshToken.save();
+    console.log(rest);
+  } catch (error) {
+    res.json({ error: error });
+  }
+};
+
 const newRefreshToken = async (req, res) => {
   try {
     // Logic to generate new refresh token
@@ -44,15 +69,27 @@ const newRefreshToken = async (req, res) => {
   }
 };
 
+const getRefreshToken = async (user_id) => {
+  try {
+    // Retreive refresh token
+    const result = await RefreshToken.findOne({
+      where: { user_id: user_id },
+    });
+    return result;
+  } catch (error) {
+    console.error("Error getting refresh token:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 const deleteRefreshToken = async (req, res) => {
   try {
-    const refreshToken = req.body.refreshToken;
-    const user_id = req.user_id;
-    console.log(refreshToken);
+    const user_id = req;
 
-    if (refreshToken == null)
-      return res.status(401).json({ message: "no Refresh Token found" });
-    existingToken = await checkRefreshToken(user_id, refreshToken);
+    const existingToken = await checkRefreshToken(user_id);
+    const refreshToken = await getRefreshToken(user_id);
+
+    console.log(refreshToken, existingToken);
 
     if (!existingToken) {
       // Token does not exist
@@ -156,6 +193,10 @@ const registerUser = async (req, res) => {
 
       // Save the new User
       await newUser.save();
+      await saveRefreshToken({
+        user_id: newUser.user_id,
+        user_email: newUser.email,
+      });
 
       res.json({ user: newUser, message: hashedPassword });
     }
@@ -195,11 +236,11 @@ const loginUser = async (req, res) => {
 
     const accessToken = await generateAccessToken(JWTuser);
     // Generate a JWT token for the authenticated user
-    const refreshToken = jwt.sign(JWTuser, process.env.REFRESH_JWT_SECRET);
+    const refreshToken = await createRefreshToken(JWTuser);
 
     // Check if refresh token already exists
     const existingToken = await checkRefreshToken(user.user_id);
-    console.log(existingToken);
+
     if (!existingToken) {
       // Token does not exist
       // Store new Refresh Token in database
@@ -376,6 +417,7 @@ const updateUser = async (req, res) => {
 
 module.exports = {
   newRefreshToken,
+  getRefreshToken,
   checkAccessTokenExpire,
   registerUser,
   deleteRefreshToken,

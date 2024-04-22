@@ -7,7 +7,11 @@ const UserAuthentication = require("../middlewares/userAuthentication");
 const UserController = require("../controllers/userController");
 
 // Route to register a new user
-router.post("/register", UserController.registerUser);
+router.post(
+  "/register",
+  UserController.registerUser,
+  UserController.newRefreshToken
+);
 
 // Route to login a user
 router.post("/login", UserController.loginUser);

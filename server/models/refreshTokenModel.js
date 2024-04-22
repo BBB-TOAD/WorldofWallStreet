@@ -6,7 +6,7 @@ const sequelize = require("../config/database"); // Configure database connectio
 
 // RefreshToken Model
 const RefreshToken = sequelize.define(
-  "refreshToken",
+  "refreshtoken",
   {
     user_id: {
       type: DataTypes.INTEGER,
