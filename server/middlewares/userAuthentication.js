@@ -22,12 +22,14 @@ const authenticateUser = (req, res, next) => {
     return res.status(401).json({ error: "Unauthorized: Missing token" });
   }
 
+  console.log(token);
+
   jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
     if (error) {
       return res.status(403).json({ error: "Unauthorized: Invalid token" });
     }
 
-    req.user_id = decoded.user_id;
+    req.user_id = decoded.userId;
 
     // move onto the userController
     next();

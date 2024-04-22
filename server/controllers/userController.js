@@ -3,13 +3,13 @@ const userAuthentication = require("../middlewares/userAuthentication");
 const User = require("../models/userModel");
 const RefreshToken = require("../models/refreshTokenModel");
 const jwt = require("jsonwebtoken");
+const { hash } = require("bcrypt");
 // Check if refreshToken still exists
 const checkRefreshToken = async (user_id) => {
   // Check if the username is already in use
   const existingToken = await RefreshToken.findOne({
     where: { user_id: user_id },
   });
-  console.log(existingToken);
   return existingToken;
 };
 
@@ -87,7 +87,6 @@ const deleteRefreshToken = async (req) => {
     const user_id = req;
 
     const existingToken = await checkRefreshToken(user_id);
-    const refreshToken = await getRefreshToken(user_id);
 
     if (!existingToken) {
       // Token does not exist
@@ -107,7 +106,6 @@ const deleteRefreshToken = async (req) => {
     );
   } catch (error) {
     console.error("Error deleting refresh token:", error);
-    // res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -120,8 +118,6 @@ const generateAccessToken = async (JWTuser) => {
 
 const checkAccessTokenExpire = (req, res, next) => {
   const accessToken = req.headers.authorization?.split(" ")[1];
-  // get the user's id
-  const { user_id } = req.params;
 
   if (!accessToken) {
     return res
@@ -133,11 +129,11 @@ const checkAccessTokenExpire = (req, res, next) => {
 
   try {
     const decodedToken = jwt.verify(accessToken, secretKey);
-    req.userId = decodedToken.sub; // Attach user ID to the request
+    req.userId = parseInt(decodedToken.userId); // Attach user ID to the request
     next();
+    console.log(parseInt(decodedToken.userId), accessToken);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      newRefreshToken(user_id);
       return res.json({ message: "New Access Token created", accessToken });
     } else {
       return res
@@ -371,7 +367,8 @@ const getUserById = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     // Get user_id
-    const { user_id } = req.params;
+
+    const user_id = req.userId;
     const { username, email, password } = req.body;
 
     // Find the user by ID
@@ -385,12 +382,16 @@ const updateUser = async (req, res) => {
     // Hash the password before storing it
     const hashedPassword = await userAuthentication.hashPassword(password);
 
-    // Update the user's information
-    await user.update({
-      username,
-      email,
-      hashedPassword,
-    });
+    const affectedRows = await User.update(
+      {
+        username: username,
+        email: email,
+        password: hashedPassword,
+      },
+      {
+        where: { user_id: user_id },
+      }
+    );
 
     res.status(200).json({ message: "User has been updated" });
   } catch (error) {
