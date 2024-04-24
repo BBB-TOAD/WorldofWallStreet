@@ -16,7 +16,7 @@ const comparePasswords = async (plaintextPassword, hashedPassword) => {
 const authenticateUser = (req, res, next) => {
   // Validate JWT
   console.log("Starting authenticateUser");
-  const token = req.headers.authorization.split(" ")[1];
+  const token = req.headers.cookie?.split("accessToken=")[1];
 
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: Missing token" });

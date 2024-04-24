@@ -90,7 +90,7 @@ const deleteRefreshToken = async (req) => {
 
     if (!existingToken) {
       // Token does not exist
-      res.status(403).json({ message: "Token does not exist" });
+      console.log("Token does not exist");
     }
 
     // Token exists
@@ -116,30 +116,21 @@ const generateAccessToken = async (JWTuser) => {
   });
 };
 
-const checkAccessTokenExpire = (req, res, next) => {
-  const accessToken = req.headers.authorization?.split(" ")[1];
+const checkAccessTokenExpire = (req) => {
+  const accessToken = req.headers.cookie?.split("accessToken=")[1];
 
   if (!accessToken) {
-    return res
-      .status(401)
-      .json({ error: "Unauthorized: Missing access token" });
+    console.log("No access token found");
   }
 
   const secretKey = process.env.JWT_SECRET; // Replace with your actual secret key
 
   try {
     const decodedToken = jwt.verify(accessToken, secretKey);
-    req.userId = parseInt(decodedToken.userId); // Attach user ID to the request
-    next();
-    console.log(parseInt(decodedToken.userId), accessToken);
+    return parseInt(decodedToken.user_id);
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      return res.json({ message: "New Access Token created", accessToken });
-    } else {
-      return res
-        .status(401)
-        .json({ error: "Unauthorized: Invalid access token" });
-    }
+    console.log("Unauthorized: Invalid access token", error);
+    return false;
   }
 };
 
@@ -174,12 +165,8 @@ const registerUser = async (req, res) => {
 
       // Save the new User
       await newUser.save();
-      await saveRefreshToken({
-        user_id: newUser.user_id,
-        user_email: newUser.email,
-      });
 
-      res.json({ user: newUser, message: hashedPassword });
+      res.json({ user: newUser });
     }
 
     // res.status(201).json({ message: "User registered successfully" });
@@ -219,9 +206,11 @@ const loginUser = async (req, res) => {
 
     res.cookie("accessToken", accessToken, {
       maxAge: 900000, // 15 minutes
-      secure: false, // set to true if you're using https
+      secure: true, // set to true if you're using https
       httpOnly: true,
+      sameSite: "strict",
     });
+
     // Generate a JWT token for the authenticated user
     const refreshToken = await createRefreshToken(JWTuser);
 
@@ -280,6 +269,12 @@ const loginUser = async (req, res) => {
 const logoutUser = async (req, res) => {
   try {
     console.log("Starting logoutUser Controller");
+    const result = checkAccessTokenExpire(req);
+
+    if (result == false) {
+      console.log("Access Token Doesn't Match");
+    }
+
     // Get email and password from req
     const { email, password } = req.body;
 
@@ -307,9 +302,11 @@ const logoutUser = async (req, res) => {
     // Now delete session data and refresh token.
 
     // Set token to none and expire in 5 seconds
-    res.cookie("accessToken", "none", {
-      expires: new Date(Date.now() + 5 * 1000),
+    res.cookie("accessToken", "", {
+      expires: new Date(0), // Set expiration to a past date (Jan 1, 1970)
       httpOnly: true,
+      secure: true, // Set to true if served over HTTPS
+      sameSite: "strict", // Set to 'strict' for added security
     });
 
     await deleteRefreshToken(user.user_id);
@@ -323,6 +320,7 @@ const logoutUser = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
+    await checkAccessTokenExpire(req);
     const users = await User.findAll({
       // Specify fields to search for
       // So that it doesn't give passwords
@@ -342,6 +340,8 @@ const getAllUsers = async (req, res) => {
 
 const getUserById = async (req, res) => {
   try {
+    await checkAccessTokenExpire(req);
+
     // get the user's id
     const { user_id } = req.params;
 
@@ -366,6 +366,7 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
+    await checkAccessTokenExpire(req);
     // Get user_id
 
     const user_id = req.userId;
