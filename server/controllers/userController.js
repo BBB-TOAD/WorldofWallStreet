@@ -3,7 +3,6 @@ const userAuthentication = require("../middlewares/userAuthentication");
 const User = require("../models/userModel");
 const RefreshToken = require("../models/refreshTokenModel");
 const jwt = require("jsonwebtoken");
-const { hash } = require("bcrypt");
 // Check if refreshToken still exists
 const checkRefreshToken = async (user_id) => {
   // Check if the username is already in use
@@ -19,23 +18,6 @@ const createRefreshToken = async (req) => {
   });
 
   return refreshToken;
-};
-
-const saveRefreshToken = async (req, res) => {
-  try {
-    const refreshToken = await createRefreshToken(req);
-    console.log(req.user_id, refreshToken);
-
-    const newRefreshToken = new RefreshToken({
-      user_id: req.user_id,
-      token: refreshToken,
-    });
-    // Save the new Refresh Token
-    const rest = await newRefreshToken.save();
-    console.log(rest);
-  } catch (error) {
-    res.json({ error: error });
-  }
 };
 
 const newRefreshToken = async (req, res) => {
@@ -320,7 +302,7 @@ const logoutUser = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    await checkAccessTokenExpire(req);
+    checkAccessTokenExpire(req);
     const users = await User.findAll({
       // Specify fields to search for
       // So that it doesn't give passwords
@@ -340,7 +322,7 @@ const getAllUsers = async (req, res) => {
 
 const getUserById = async (req, res) => {
   try {
-    await checkAccessTokenExpire(req);
+    checkAccessTokenExpire(req);
 
     // get the user's id
     const { user_id } = req.params;
@@ -366,7 +348,7 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    await checkAccessTokenExpire(req);
+    checkAccessTokenExpire(req);
     // Get user_id
 
     const user_id = req.userId;
