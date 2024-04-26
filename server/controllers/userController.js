@@ -2,119 +2,9 @@
 const userAuthentication = require("../middlewares/userAuthentication");
 const User = require("../models/userModel");
 const RefreshToken = require("../models/refreshTokenModel");
-const jwt = require("jsonwebtoken");
+const tokenController = require("./tokenController");
+
 // Check if refreshToken still exists
-const checkRefreshToken = async (user_id) => {
-  // Check if the username is already in use
-  const existingToken = await RefreshToken.findOne({
-    where: { user_id: user_id },
-  });
-  return existingToken;
-};
-
-const createRefreshToken = async (req) => {
-  const refreshToken = await jwt.sign(req, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
-
-  return refreshToken;
-};
-
-const newRefreshToken = async (req, res) => {
-  try {
-    // Logic to generate new refresh token
-    const refreshToken = req.body.refreshToken;
-    const user_id = req.user_id;
-
-    if (refreshToken == null)
-      return res.status(401).json({ message: "no Refresh Token found" });
-
-    existingToken = await checkRefreshToken(user_id, refreshToken);
-
-    if (!existingToken) {
-      // Token does not exist
-      res.status(403).json({ message: "Token does not exist" });
-    }
-
-    jwt.verify(refreshToken, process.env.REFRESH_JWT_SECRET, (err, user) => {
-      if (err)
-        return send.status(403).json({ message: "JWT Verification Failed" });
-      accessToken = generateAccessToken({
-        user_id: user.user_id,
-        user_email: user.email,
-      });
-      res.json({ accessToken: accessToken });
-    });
-  } catch (error) {
-    console.error("Error generating refresh token:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-const getRefreshToken = async (req, res) => {
-  try {
-    // Retreive refresh token
-    const result = await RefreshToken.findOne({
-      where: { user_id: req },
-    });
-    return result.dataValues.token;
-  } catch (error) {
-    console.error("Error getting refresh token:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-const deleteRefreshToken = async (req) => {
-  try {
-    const user_id = req;
-
-    const existingToken = await checkRefreshToken(user_id);
-
-    if (!existingToken) {
-      // Token does not exist
-      console.log("Token does not exist");
-    }
-
-    // Token exists
-    // Delete Refresh Token
-    RefreshToken.destroy({ where: { user_id: user_id } }).then(
-      (rowsDeleted) => {
-        if (rowsDeleted > 0) {
-          console.log("Refresh Token deleted successfully.");
-        } else {
-          console.log("No matching record found for the given user_id");
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Error deleting refresh token:", error);
-  }
-};
-
-// Make a JWT Access Token generator for refresh tokens
-const generateAccessToken = async (JWTuser) => {
-  return jwt.sign(JWTuser, process.env.JWT_SECRET, {
-    expiresIn: "15m",
-  });
-};
-
-const checkAccessTokenExpire = (req) => {
-  const accessToken = req.headers.cookie?.split("accessToken=")[1];
-
-  if (!accessToken) {
-    console.log("No access token found");
-  }
-
-  const secretKey = process.env.JWT_SECRET; // Replace with your actual secret key
-
-  try {
-    const decodedToken = jwt.verify(accessToken, secretKey);
-    return parseInt(decodedToken.user_id);
-  } catch (error) {
-    console.log("Unauthorized: Invalid access token", error);
-    return false;
-  }
-};
 
 const registerUser = async (req, res) => {
   try {
@@ -184,7 +74,7 @@ const loginUser = async (req, res) => {
     // Access Token
     JWTuser = { user_id: user.user_id, user_email: user.email };
 
-    const accessToken = await generateAccessToken(JWTuser);
+    const accessToken = await tokenController.generateAccessToken(JWTuser);
 
     res.cookie("accessToken", accessToken, {
       maxAge: 900000, // 15 minutes
@@ -194,10 +84,10 @@ const loginUser = async (req, res) => {
     });
 
     // Generate a JWT token for the authenticated user
-    const refreshToken = await createRefreshToken(JWTuser);
+    const refreshToken = await tokenController.createRefreshToken(JWTuser);
 
     // Check if refresh token already exists
-    const existingToken = await checkRefreshToken(user.user_id);
+    const existingToken = await tokenController.checkRefreshToken(user.user_id);
 
     if (!existingToken) {
       // Token does not exist
@@ -251,11 +141,6 @@ const loginUser = async (req, res) => {
 const logoutUser = async (req, res) => {
   try {
     console.log("Starting logoutUser Controller");
-    const result = checkAccessTokenExpire(req);
-
-    if (result == false) {
-      console.log("Access Token Doesn't Match");
-    }
 
     // Get email and password from req
     const { email, password } = req.body;
@@ -291,7 +176,7 @@ const logoutUser = async (req, res) => {
       sameSite: "strict", // Set to 'strict' for added security
     });
 
-    await deleteRefreshToken(user.user_id);
+    await tokenController.deleteRefreshToken(user.user_id);
 
     res.status(200).json({ message: "User logged out succesfully" });
   } catch (error) {
@@ -348,7 +233,6 @@ const getUserById = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    checkAccessTokenExpire(req);
     // Get user_id
 
     const user_id = req.userId;
@@ -383,17 +267,37 @@ const updateUser = async (req, res) => {
   }
 };
 
+const deleteUser = async (req, res) => {
+  try {
+    // Get user_id
+    console.log("Delete User");
+    const user_id = req.userId;
+
+    // Find the user by ID
+    const user = await User.findByPk(user_id);
+
+    // If the user doesn't exist, return a 404 Not Found
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await user.destroy();
+
+    res.status(200).json({ message: "User has been updated" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Logout -> deletes refresh token in database
 
 module.exports = {
-  newRefreshToken,
-  getRefreshToken,
-  checkAccessTokenExpire,
   registerUser,
-  deleteRefreshToken,
   loginUser,
   logoutUser,
   getAllUsers,
   getUserById,
   updateUser,
+  deleteUser,
 };
