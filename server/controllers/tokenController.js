@@ -63,7 +63,7 @@ const getRefreshToken = async (req, res) => {
   }
 };
 
-const deleteRefreshToken = async (req) => {
+const deleteRefreshToken = async (req, res) => {
   try {
     const user_id = req;
 
@@ -89,12 +89,30 @@ const deleteRefreshToken = async (req) => {
     console.error("Error deleting refresh token:", error);
   }
 };
+// TODO: Make access tokens using refresh tokens, refresh tokens using user_id only, access tokens are made by using user_id obtained from refresh tokens
+// Function to generate a new access token using a refresh token
+const generateAccessToken = (refreshToken) => {
+  try {
+    // Verify the refresh token and extract necessary information
+    const decodedToken = jwt.verify(
+      refreshToken,
+      process.env.REFRESH_JWT_SECRET
+    );
 
-// Make a JWT Access Token generator for refresh tokens
-const generateAccessToken = async (JWTuser) => {
-  return jwt.sign(JWTuser, process.env.JWT_SECRET, {
-    expiresIn: "15m",
-  });
+    // Generate a new access token using the extracted information
+    const accessToken = jwt.sign(
+      { userId: decodedToken.userId },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m", // Set the expiration time for the access token
+      }
+    );
+
+    return accessToken;
+  } catch (error) {
+    console.log("Error generating access token:", error);
+    return null;
+  }
 };
 
 const checkAccessTokenExpire = (req) => {
@@ -131,6 +149,7 @@ const checkAccessTokenExpire = (req) => {
 };
 
 const verifyAccessToken = async (req, res, next) => {
+  // TODO Make a new Access token if it has expired
   console.log("Verify the Access Token");
   const accessToken = req.headers.cookie?.split("accessToken=")[1];
 
@@ -148,6 +167,17 @@ const verifyAccessToken = async (req, res, next) => {
   }
 };
 
+const newAccessToken = async (req, res, next) => {
+  const accessToken = tokenController.generateAccessToken(JWTuser);
+
+  res.cookie("accessToken", accessToken, {
+    maxAge: 900000, // 15 minutes
+    secure: true, // set to true if you're using https
+    httpOnly: true,
+    sameSite: "strict",
+  });
+};
+
 module.exports = {
   newRefreshToken,
   getRefreshToken,
@@ -157,4 +187,5 @@ module.exports = {
   generateAccessToken,
   deleteRefreshToken,
   verifyAccessToken,
+  newAccessToken,
 };

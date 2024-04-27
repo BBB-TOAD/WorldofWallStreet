@@ -16,7 +16,8 @@ router.post("/register", UserController.registerUser);
 router.post(
   "/login",
   UserController.loginUser,
-  tokenController.newRefreshToken
+  tokenController.newRefreshToken,
+  tokenController.newAccessToken
 );
 
 // Route to logout a user
@@ -24,14 +25,8 @@ router.post(
   "/logout",
   UserAuthentication.authenticateUser,
   tokenController.verifyAccessToken,
+  tokenController.deleteRefreshToken,
   UserController.logoutUser
-);
-
-router.post(
-  "/refresh_token",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
-  tokenController.newRefreshToken
 );
 
 // Route to get all users

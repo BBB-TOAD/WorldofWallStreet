@@ -70,68 +70,6 @@ const loginUser = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Authentication failed" });
     }
-
-    // Access Token
-    JWTuser = { user_id: user.user_id, user_email: user.email };
-
-    const accessToken = await tokenController.generateAccessToken(JWTuser);
-
-    res.cookie("accessToken", accessToken, {
-      maxAge: 900000, // 15 minutes
-      secure: true, // set to true if you're using https
-      httpOnly: true,
-      sameSite: "strict",
-    });
-
-    // Generate a JWT token for the authenticated user
-    const refreshToken = await tokenController.createRefreshToken(JWTuser);
-
-    // Check if refresh token already exists
-    const existingToken = await tokenController.checkRefreshToken(user.user_id);
-
-    if (!existingToken) {
-      // Token does not exist
-      // Store new Refresh Token in database
-      const newRefreshToken = new RefreshToken({
-        user_id: user.user_id,
-        token: refreshToken,
-      });
-      // Save the new Refresh Token
-      await newRefreshToken.save();
-      res.status(200).json({
-        message: "Authentication successful",
-        accessToken,
-        newRefreshToken,
-      });
-    } else if (existingToken) {
-      // Token exists
-      // Change Token Value
-      RefreshToken.update(
-        { token: refreshToken },
-        { where: { user_id: user.user_id } }
-      )
-        .then((updatedRows) => {
-          if (updatedRows > 0) {
-            console.log("Refresh token updated successfully");
-            res.json({
-              message: "Refresh token updated successfully",
-              refreshToken,
-            });
-          } else {
-            console.log("No matching record found for the given user_id");
-            res.json({
-              message: "No matching record found for the given user_id",
-            });
-          }
-        })
-        .catch((error) => {
-          console.error("Error updating refresh token:", error);
-          res.json({
-            message: "Error updating refresh token:",
-            error,
-          });
-        });
-    }
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -168,15 +106,13 @@ const logoutUser = async (req, res) => {
 
     // Now delete session data and refresh token.
 
-    // Set token to none and expire in 5 seconds
+    // Set token to none and expire
     res.cookie("accessToken", "", {
-      expires: new Date(0), // Set expiration to a past date (Jan 1, 1970)
+      expires: new Date(0),
       httpOnly: true,
       secure: true, // Set to true if served over HTTPS
       sameSite: "strict", // Set to 'strict' for added security
     });
-
-    await tokenController.deleteRefreshToken(user.user_id);
 
     res.status(200).json({ message: "User logged out succesfully" });
   } catch (error) {
@@ -235,8 +171,9 @@ const updateUser = async (req, res) => {
   try {
     // Get user_id
 
-    const user_id = req.userId;
+    const user_id = parseInt(req.params.user_id);
     const { username, email, password } = req.body;
+    console.log(req.params.user_id);
 
     // Find the user by ID
     const user = await User.findByPk(user_id);
@@ -271,7 +208,8 @@ const deleteUser = async (req, res) => {
   try {
     // Get user_id
     console.log("Delete User");
-    const user_id = req.userId;
+    const user_id = req.params.user_id;
+    console.log(req.params.user_id);
 
     // Find the user by ID
     const user = await User.findByPk(user_id);

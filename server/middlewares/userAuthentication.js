@@ -2,6 +2,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const tokenController = require("../controllers/tokenController");
+const User = require("../models/userModel");
 
 // Authentication for hashing passwords
 
@@ -17,7 +18,21 @@ const comparePasswords = async (plaintextPassword, hashedPassword) => {
 const authenticateUser = async (req, res, next) => {
   const accessTokenExpired = tokenController.checkAccessTokenExpire(req);
   if (accessTokenExpired) {
+    const user_id = parseInt(req.params.user_id);
+    // Fetch the user from the database based on the email
+    const user = await User.findOne({ where: { user_id: user_id } });
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    // Access Token
+    JWTuser = { user_id: user.user_id, user_email: user.email };
+
     const accessToken = await tokenController.generateAccessToken(JWTuser);
+    console.log("Access token has expired");
 
     res.cookie("accessToken", accessToken, {
       maxAge: 900000, // 15 minutes
