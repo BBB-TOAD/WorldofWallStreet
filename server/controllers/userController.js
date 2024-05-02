@@ -48,8 +48,9 @@ const registerUser = async (req, res) => {
   }
 };
 
-const loginUser = async (req, res) => {
+const loginUser = async (req, res, next) => {
   try {
+    console.log("Logging in User");
     const { email, password } = req.body;
 
     // Fetch the user from the database based on the email
@@ -70,6 +71,8 @@ const loginUser = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Authentication failed" });
     }
+    console.log("Done Logging in User");
+    next();
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -79,29 +82,18 @@ const loginUser = async (req, res) => {
 const logoutUser = async (req, res) => {
   try {
     console.log("Starting logoutUser Controller");
+    const user_id = req.body.user_id;
 
     // Get email and password from req
-    const { email, password } = req.body;
 
     // Fetch the user from the database based on the email
-    const user = await User.findOne({ where: { email: email } });
+    const user = await User.findOne({ where: { user_id: user_id } });
 
     // Check if user exists
     if (!user) {
       return res
         .status(401)
         .json({ message: "User with this email does not exist" });
-    }
-
-    // Compare the entered password with the stored hashed password
-    const isPasswordValid = await userAuthentication.comparePasswords(
-      password,
-      user.password
-    );
-
-    // Check if entered password matchs with the stored hashed password
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: "Authentication failed" });
     }
 
     // Now delete session data and refresh token.
@@ -121,9 +113,8 @@ const logoutUser = async (req, res) => {
   }
 };
 
-const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res, next) => {
   try {
-    checkAccessTokenExpire(req);
     const users = await User.findAll({
       // Specify fields to search for
       // So that it doesn't give passwords
@@ -135,16 +126,15 @@ const getAllUsers = async (req, res) => {
     }
 
     res.status(200).json({ message: "Got all users", users });
+    next();
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-const getUserById = async (req, res) => {
+const getUserById = async (req, res, next) => {
   try {
-    checkAccessTokenExpire(req);
-
     // get the user's id
     const { user_id } = req.params;
 
@@ -159,8 +149,7 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ message: "There is no user with this id" });
     }
 
-    // return the user
-    res.status(200).json({ message: "Got user by id", user });
+    next();
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });
@@ -221,7 +210,7 @@ const deleteUser = async (req, res) => {
 
     await user.destroy();
 
-    res.status(200).json({ message: "User has been updated" });
+    res.status(200).json({ message: "User has been deleted" });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Server error" });

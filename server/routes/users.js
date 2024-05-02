@@ -17,51 +17,41 @@ router.post(
   "/login",
   UserController.loginUser,
   tokenController.newRefreshToken,
-  tokenController.newAccessToken
+  tokenController.verifyAccessToken
 );
 
 // Route to logout a user
 router.post(
   "/logout",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
+
   tokenController.deleteRefreshToken,
   UserController.logoutUser
 );
 
 // Route to get all users
-router.get("/", UserController.getAllUsers);
+router.get("/", UserController.getAllUsers, tokenController.verifyAccessToken);
 
 // Route to get a user
 router.get(
   "/:user_id",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
-  UserController.getUserById
+
+  UserController.getUserById,
+  tokenController.verifyAccessToken
 );
 
 // Route to update a user's profile
 router.put(
   "/:user_id",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
-  UserController.updateUser
+
+  UserController.updateUser,
+  tokenController.verifyAccessToken
 );
 
 // Route to delete a user
 router.delete(
   "/:user_id",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
-  UserController.deleteUser,
-  tokenController.deleteRefreshToken
-);
-
-router.delete(
-  "/refresh_token",
-  UserAuthentication.authenticateUser,
-  tokenController.verifyAccessToken,
-  tokenController.deleteRefreshToken
+  tokenController.deleteRefreshToken,
+  UserController.deleteUser
 );
 
 module.exports = router;
