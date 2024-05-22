@@ -109,7 +109,6 @@ const deleteRefreshToken = async (req, res, next) => {
   }
 };
 
-// TODO: Make access tokens using refresh tokens, refresh tokens using user_id only, access tokens are made by using user_id obtained from refresh tokens
 // Function to generate a new access token using a refresh token
 const generateAccessToken = (user_id) => {
   try {
@@ -126,7 +125,6 @@ const generateAccessToken = (user_id) => {
 };
 
 const verifyAccessToken = async (req, res) => {
-  // TODO Make a new Access token if it has expired
   // Does it exist
   // Is it right
   // Did it expire
